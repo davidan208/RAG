@@ -1,7 +1,7 @@
 from typing import Literal
 import os
 import multiprocessing
-from langchain_community.document_loaders import PyPDFLoader, TextLoader, UnstructuredMarkdownLoader, DirectoryLoader
+from langchain_community.document_loaders import PyPDFLoader, TextLoader, JSONLoader, UnstructuredMarkdownLoader, DirectoryLoader
 from langchain_core.document_loaders import BaseLoader
 from langchain_experimental.text_splitter import SemanticChunker
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -20,7 +20,7 @@ class BaseLoader:
     def __init__(self) -> None:
         self.num_process = get_cpu()
         embeddings = HuggingFaceEmbeddings(model_name="VoVanPhuc/sup-SimCSE-VietNamese-phobert-base", cache_folder = "./embed_model")
-        self.text_splitter = SemanticChunker(embeddings, breakpoint_threshold_type = "standard_deviation")
+        self.text_splitter = SemanticChunker(embeddings, breakpoint_threshold_type = "interquartile")
     
     def __call__(self, link: str, **kwargs):
         pass
@@ -99,27 +99,45 @@ class MDLoader(BaseLoader):
             docs = md_loader.load()
         
         return self.split_documents(docs)
-    
+
+class JsonLoader(BaseLoader):
+    def __init__(self) -> None:
+        super().__init__()
+
+    def __call__(self, link: str, **kwargs):
+        if os.path.isfile(link):
+            print("FOUND FILE")
+            js_loader = JSONLoader( file_path = link,
+                                    jq_schema = '.content')
+        elif os.path.isdir(link):
+            print("FOUND DIR")
+            def custom_json_loader(file_path: str):
+                return JSONLoader(file_path=file_path, jq_schema='.content')
+
+            js_loader = DirectoryLoader(    path = link,
+                                            glob = "**/*.json",
+                                            loader_cls = custom_json_loader,
+                                            show_progress = True,
+                                            use_multithreading = True,
+                                            max_concurrency = min(self.num_process, kwargs['workers']) )
+
+        docs = js_loader.load()
+        for doc in docs:
+            doc.page_content = remove_non_utf8_characters(doc.page_content)
+        return self.split_documents(docs)
+ 
 class Loader:
     def __init__(self):
-        # self.pdf_loader = PDFLoader()
-        self.txt_loader = TXTLoader()
-        # self.md_loader = MDLoader()
-    def __call__(self, link: str, file_type: Literal['pdf', 'txt', 'md'], **kwargs):
+        self.json_loader = JsonLoader()
+    def __call__(self, link: str, file_type: Literal['pdf', 'txt', 'md', 'json'], **kwargs):
         match file_type:
-            case "txt":
-                return self.txt_loader(link, **kwargs)
+            case "json":
+                return self.json_loader(link, **kwargs)
             case _:
                 raise ValueError("[PROBLEM PENDING] Chưa hỗ trợ định dạng này")
-        # if file_type == 'pdf':
-        #     return self.pdf_loader(link, **kwargs)
-        # elif file_type == 'txt':
-        #     return self.txt_loader(link, **kwargs)
-        # elif file_type == 'md':
-        #     return self.md_loader(link, **kwargs)
-        # else:
-        #     raise ValueError("Unsupported file type")
         
 a = Loader()
-chunks = a('./src/sub.txt', 'txt')
+chunks = a('./src', 'json', workers = 2)
+# print(len(chunks))
+print(chunks)
 print(len(chunks))
