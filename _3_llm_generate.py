@@ -1,6 +1,3 @@
-from huggingface_hub import login
-login("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")
-
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 from transformers import BitsAndBytesConfig
 import os
@@ -9,6 +6,7 @@ from langchain_huggingface import HuggingFacePipeline
 
 def get_hf_llm( model : str = "Viet-Mistral/Vistral-7B-Chat",
                             max_new_tokens = 1024,
+                            repetition_penalty = 1.19,
                             **kwargs):
     offline_models = './offline_models'
 
@@ -34,6 +32,7 @@ def get_hf_llm( model : str = "Viet-Mistral/Vistral-7B-Chat",
                                 pad_token_id = tokenizer.eos_token_id,
                                 device_map = "auto",
                                 early_stopping = True,
+                                repetition_penalty = repetition_penalty
                                 )
     
     llm = HuggingFacePipeline(pipeline = model_pipeline, model_kwargs= kwargs)
