@@ -21,8 +21,8 @@ def get_cpu():
 class BaseLoader:
     def __init__(self) -> None:
         self.num_process = get_cpu()
-        embeddings = HuggingFaceEmbeddings(model_name="VoVanPhuc/sup-SimCSE-VietNamese-phobert-base", cache_folder = "./embed_model")
-        self.text_splitter = SemanticChunker(embeddings, breakpoint_threshold_type = "percentile")
+        embeddings = HuggingFaceEmbeddings(model_name="dangvantuan/vietnamese-embedding-LongContext", cache_folder = "./embed_model", model_kwargs = {'trust_remote_code': True})
+        self.text_splitter = SemanticChunker(embeddings, breakpoint_threshold_type = "standard_deviation", breakpoint_threshold_amount = 4)
     
     def __call__(self, link: str, **kwargs):
         pass
@@ -139,7 +139,7 @@ class JsonLoader(BaseLoader):
         
         # Convert JSON content into documents, skipping those with empty or blank 'content'
         docs = [
-            Document(page_content=item["content"], metadata={"source": item["#url"], "title": item["title"], "description": item["description"]})
+            Document(page_content=remove_non_utf8_characters(item["content"]), metadata={"source": item["#url"], "title": item["title"], "description": item["description"], "date": item["meta_data"]["datetime_crawled"], "keywords": item["meta_data"]["keywords"]})
             for item in json_data
             if item["content"].strip()  # Skip empty or blank content
         ]
@@ -155,15 +155,17 @@ class JsonLoader(BaseLoader):
 class Loader:
     def __init__(self):
         self.json_loader = JsonLoader()
-    def __call__(self, link: str, file_type: Literal['pdf', 'txt', 'md', 'json'], **kwargs):
+    def __call__(self, link: str, file_type: Literal['pdf', 'txt', 'md', 'json']):
         match file_type:
             case "json":
-                return self.json_loader(link, **kwargs)
+                return self.json_loader(link)
             case _:
                 raise ValueError("[PROBLEM PENDING] Chưa hỗ trợ định dạng này")
-        
 
+import time    
+
+start = time.time()
 a = Loader()
-b = a('./json_src/test.json', 'json', workers = 6)
-for chunk in b:
-    print('start', b, end = "\n\n\n ----- \n\n\n ")
+b = a('./json_src/crawl_data_3009.json', 'json')
+print(f"{time.time() - start}s for {len(b)}")
+print(b[-2])
