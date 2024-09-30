@@ -19,11 +19,12 @@ content = data['content']
 
 
 # HuggingFace -> OpenAI
-llm = get_hf_llm(temperature = 0)
+llm = get_hf_llm(temperature = 0.1)
 
 related_prompt_template = '''
+Cho biết
 content: {content}
-Sinh ra 20 câu hỏi hoàn toàn khác nhau chỉ dựa trên content.
+Sinh ra 10 câu hỏi không liên quan tới nhau kết thúc bằng dấu "?" dựa trên content bên trên. Không cần câu trả lời.
 '''
 
 related_prompt = PromptTemplate(
