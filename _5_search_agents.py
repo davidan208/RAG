@@ -28,7 +28,7 @@ class SearchAgent:
         return self.format_response(output_response)
 
     def format_response(self, response: str) -> str:
-        formatted_response = "\n'LƯU Ý': Kết quả có thể không chính xác do được thực hiện dựa trên việc tìm kiếm qua internet \n\n"
+        formatted_response = "[LƯU Ý]: Kết quả có thể không chính xác do được thực hiện dựa trên việc tìm kiếm qua internet \n\n"
         formatted_response += f"{response}\n"
         return formatted_response
     
