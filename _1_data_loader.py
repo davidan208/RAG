@@ -4,8 +4,10 @@ import multiprocessing
 from langchain_community.document_loaders import PyPDFLoader, TextLoader, JSONLoader, UnstructuredMarkdownLoader, DirectoryLoader
 from langchain_core.document_loaders import BaseLoader
 from langchain_experimental.text_splitter import SemanticChunker
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.documents import Document
+import json
 
 def remove_non_utf8_characters(text):
     Vietnamese_character_ranges = [(32, 126), (160, 255), (256, 383), (384, 591), (768, 879), (7680, 7935)]
@@ -20,12 +22,12 @@ class BaseLoader:
     def __init__(self) -> None:
         self.num_process = get_cpu()
         embeddings = HuggingFaceEmbeddings(model_name="VoVanPhuc/sup-SimCSE-VietNamese-phobert-base", cache_folder = "./embed_model")
-        self.text_splitter = SemanticChunker(embeddings, breakpoint_threshold_type = "interquartile")
+        self.text_splitter = SemanticChunker(embeddings, breakpoint_threshold_type = "percentile")
     
     def __call__(self, link: str, **kwargs):
         pass
     
-    def split_documents(self, docs):
+    def split_document(self, docs):
         # Combine all documents into a single large document
         combined_text = "\n\n".join([doc.page_content for doc in docs])
         combined_doc = Document(page_content=combined_text, metadata={"source": "combined"})
@@ -100,7 +102,7 @@ class MDLoader(BaseLoader):
         
         return self.split_documents(docs)
 
-class JsonLoader(BaseLoader):
+class _JsonLoader(BaseLoader):
     def __init__(self) -> None:
         super().__init__()
 
@@ -125,6 +127,30 @@ class JsonLoader(BaseLoader):
         for doc in docs:
             doc.page_content = remove_non_utf8_characters(doc.page_content)
         return self.split_documents(docs)
+    
+class JsonLoader(BaseLoader):
+    def __init__(self) -> None:
+        super().__init__()
+
+    def __call__(self, link: str, **kwargs):
+        # Load JSON content from the link (or file path)
+        with open(link, "r", encoding="utf-8") as f:
+            json_data = json.load(f)
+        
+        # Convert JSON content into documents, skipping those with empty or blank 'content'
+        docs = [
+            Document(page_content=item["content"], metadata={"source": item["#url"], "title": item["title"], "description": item["description"]})
+            for item in json_data
+            if item["content"].strip()  # Skip empty or blank content
+        ]
+        
+        # Split the documents into chunks
+        chunks = self.split_document(docs)
+        return chunks
+    
+    def split_document(self, docs):
+        chunks = self.text_splitter.split_documents(docs)
+        return chunks
  
 class Loader:
     def __init__(self):
@@ -136,8 +162,8 @@ class Loader:
             case _:
                 raise ValueError("[PROBLEM PENDING] Chưa hỗ trợ định dạng này")
         
+
 a = Loader()
-chunks = a('./src', 'json', workers = 2)
-# print(len(chunks))
-print(chunks)
-print(len(chunks))
+b = a('./json_src/test.json', 'json', workers = 6)
+for chunk in b:
+    print('start', b, end = "\n\n\n ----- \n\n\n ")
